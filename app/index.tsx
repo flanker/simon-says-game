@@ -6,7 +6,7 @@ import { AudioContext } from "react-native-audio-api";
 
 const { width, height } = Dimensions.get("window");
 const gameBoardSize = Math.min(width, height) * 0.75;
-const GAP = 16;
+const GAP = 28;
 const PADDING = 20;
 const padSize = (gameBoardSize - PADDING * 2 - GAP) / 2;
 
@@ -211,8 +211,8 @@ export default function Game() {
           <Text style={styles.subtitle}>Memory Game</Text>
         </View>
         <View style={styles.highScoreSection}>
-          <Text style={styles.highScoreLabel}>BEST</Text>
           <Text style={styles.highScoreValue}>{highScore}</Text>
+          <Text style={styles.highScoreLabel}>BEST</Text>
         </View>
       </View>
 
@@ -283,7 +283,7 @@ export default function Game() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f172a", // slate-900
+    backgroundColor: "#FDF4E3", // cream/beige macaron background
     alignItems: "center",
     justifyContent: "space-evenly",
     paddingVertical: 40,
@@ -303,20 +303,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: "bold",
-    color: "#f8fafc", // slate-50
+    color: "#475569", // slate-600
     letterSpacing: -1,
     lineHeight: 36,
   },
   titleAccent: {
     fontSize: 36,
     fontWeight: "bold",
-    color: "#22d3ee", // cyan-400
+    color: "#FF8593", // strawberry macaron
     letterSpacing: -1,
     lineHeight: 36,
   },
   subtitle: {
     fontSize: 10,
-    color: "#64748b", // slate-500
+    color: "#94a3b8", // slate-400
     letterSpacing: 2,
     textTransform: "uppercase",
     marginTop: 2,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   highScoreLabel: {
     fontSize: 10,
-    color: "#475569", // slate-600
+    color: "#94a3b8", // slate-400
     fontWeight: "bold",
     letterSpacing: 1.5,
     marginBottom: 2,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   highScoreValue: {
     fontSize: 36,
     fontFamily: "monospace",
-    color: "#22d3ee", // cyan-400
+    color: "#FF8593", // strawberry macaron
     fontWeight: "700",
   },
   currentScoreDisplay: {
@@ -345,10 +345,10 @@ const styles = StyleSheet.create({
   currentScoreNumber: {
     fontSize: 96,
     fontWeight: "200",
-    color: "#f8fafc", // slate-50
+    color: "#475569", // slate-600
     fontFamily: "monospace",
     letterSpacing: -4,
-    textShadowColor: "rgba(34, 211, 238, 0.3)",
+    textShadowColor: "rgba(111, 208, 178, 0.2)", // seafoam glow
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   currentScoreLabel: {
     fontSize: 11,
-    color: "#64748b", // slate-500
+    color: "#94a3b8", // slate-400
     fontWeight: "600",
     letterSpacing: 2,
   },
@@ -370,16 +370,16 @@ const styles = StyleSheet.create({
   gameBoard: {
     width: gameBoardSize,
     height: gameBoardSize,
-    backgroundColor: "#1e293b", // slate-800
+    backgroundColor: "#ffffff", // white
     borderRadius: gameBoardSize / 2,
     padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 50,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 40,
     elevation: 20,
-    borderWidth: 4,
-    borderColor: "#334155", // slate-700
+    borderWidth: 8,
+    borderColor: "#ffffff", // white border
   },
   padsGrid: {
     width: "100%",
@@ -397,28 +397,31 @@ const styles = StyleSheet.create({
   startButton: {
     width: "100%",
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
+    borderBottomWidth: 4,
   },
   startButtonStart: {
-    backgroundColor: "#22d3ee", // cyan-500
+    backgroundColor: "#85C4FF", // azure macaron
+    borderBottomColor: "#65A4DF",
   },
   startButtonRestart: {
-    backgroundColor: "#475569", // slate-600
-    borderWidth: 1,
-    borderColor: "#64748b", // slate-500
+    backgroundColor: "#cbd5e1", // slate-300
+    borderBottomColor: "#94a3b8", // slate-400
   },
   startButtonGameOver: {
-    backgroundColor: "#ef4444", // red-500
+    backgroundColor: "#FF8593", // strawberry macaron
+    borderBottomColor: "#E06573",
   },
   startButtonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }, { translateY: 4 }],
+    borderBottomWidth: 0,
   },
   startButtonText: {
     color: "#ffffff",
@@ -429,7 +432,7 @@ const styles = StyleSheet.create({
   hintText: {
     marginTop: 24,
     textAlign: "center",
-    color: "#475569", // slate-600
+    color: "#94a3b8", // slate-400
     fontSize: 12,
     paddingHorizontal: 32,
   },
@@ -465,19 +468,19 @@ const styles = StyleSheet.create({
 
 const padColorStyles = {
   [Color.Green]: StyleSheet.create({
-    base: { backgroundColor: "#16a34a", borderColor: "#15803d" }, // green-600, green-700
-    active: { backgroundColor: "#4ade80", shadowColor: "#4ade80" }, // green-400
+    base: { backgroundColor: "#6FD0B2", borderColor: "#4FB092" }, // seafoam macaron
+    active: { backgroundColor: "#98E6CD", shadowColor: "#6FD0B2" }, // lighter seafoam
   }),
   [Color.Red]: StyleSheet.create({
-    base: { backgroundColor: "#dc2626", borderColor: "#b91c1c" }, // red-600, red-700
-    active: { backgroundColor: "#f87171", shadowColor: "#f87171" }, // red-400
+    base: { backgroundColor: "#FF8593", borderColor: "#E06573" }, // strawberry macaron
+    active: { backgroundColor: "#FFACB7", shadowColor: "#FF8593" }, // lighter strawberry
   }),
   [Color.Yellow]: StyleSheet.create({
-    base: { backgroundColor: "#eab308", borderColor: "#ca8a04" }, // yellow-500, yellow-600
-    active: { backgroundColor: "#facc15", shadowColor: "#facc15" }, // yellow-400
+    base: { backgroundColor: "#FFD768", borderColor: "#E0B849" }, // custard macaron
+    active: { backgroundColor: "#FFE699", shadowColor: "#FFD768" }, // lighter custard
   }),
   [Color.Blue]: StyleSheet.create({
-    base: { backgroundColor: "#2563eb", borderColor: "#1d4ed8" }, // blue-600, blue-700
-    active: { backgroundColor: "#60a5fa", shadowColor: "#60a5fa" }, // blue-400
+    base: { backgroundColor: "#85C4FF", borderColor: "#65A4DF" }, // azure macaron
+    active: { backgroundColor: "#ADD8FF", shadowColor: "#85C4FF" }, // lighter azure
   }),
 };
