@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { AudioContext } from "react-native-audio-api";
 import AudioManager from "react-native-audio-api/src/system/AudioManager";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 const gameBoardSize = Math.min(width, height) * 0.75;
@@ -42,6 +43,31 @@ interface GamePadProps {
 
 const GamePad: React.FC<GamePadProps> = ({ color, isActive, onClick, disabled }) => {
   const [isPressed, setIsPressed] = useState(false);
+  const scale = useSharedValue(1);
+  const rippleScale = useSharedValue(0);
+  const rippleOpacity = useSharedValue(0);
+
+  // Trigger animation when active or pressed
+  useEffect(() => {
+    if (isActive || isPressed) {
+      scale.value = withSequence(withTiming(1.05, { duration: 100 }), withTiming(1, { duration: 100 }));
+
+      // Ripple effect: start from center (scale 0) and expand outward
+      rippleScale.value = 0;
+      rippleOpacity.value = 0.8;
+      rippleScale.value = withTiming(1.5, { duration: 400 });
+      rippleOpacity.value = withTiming(0, { duration: 400 });
+    }
+  }, [isActive, isPressed]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const rippleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: rippleScale.value }],
+    opacity: rippleOpacity.value,
+  }));
 
   const padStyles = [
     styles.padBase,
@@ -52,15 +78,20 @@ const GamePad: React.FC<GamePadProps> = ({ color, isActive, onClick, disabled })
   ];
 
   return (
-    <Pressable
-      onPressIn={() => setIsPressed(true)}
-      onPressOut={() => setIsPressed(false)}
-      onPress={() => !disabled && onClick(color)}
-      disabled={disabled}
-      style={padStyles}
-    >
-      <LinearGradient colors={["rgba(255, 255, 255, 0.4)", "transparent"]} style={styles.glossyOverlay} />
-    </Pressable>
+    <Animated.View style={[styles.padContainer, animatedStyle]}>
+      <Pressable
+        onPressIn={() => setIsPressed(true)}
+        onPressOut={() => setIsPressed(false)}
+        onPress={() => !disabled && onClick(color)}
+        disabled={disabled}
+        style={padStyles}
+      >
+        <LinearGradient colors={["rgba(255, 255, 255, 0.4)", "transparent"]} style={styles.glossyOverlay} />
+        <Animated.View style={[styles.rippleEffect, rippleStyle]}>
+          <View style={styles.rippleCircle} />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
   );
 };
 
@@ -453,6 +484,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   // GamePad styles
+  padContainer: {
+    width: padSize,
+    height: padSize,
+  },
   padBase: {
     width: padSize,
     height: padSize,
@@ -479,6 +514,23 @@ const styles = StyleSheet.create({
     height: "50%",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+  },
+  rippleEffect: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderRadius: 16,
+  },
+  rippleCircle: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "white",
+    borderRadius: 1000,
   },
 });
 
