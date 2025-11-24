@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
@@ -30,6 +31,7 @@ const FREQUENCIES: Record<Color, number> = {
 const ERROR_FREQ = 110; // A2
 
 const HIGH_SCORE_KEY = "simon_says_high_score";
+const SOUND_ENABLED_KEY = "simon_says_sound_enabled";
 
 // =================================================================
 // GamePad Component
@@ -107,6 +109,7 @@ export default function Game() {
   const [playerSequence, setPlayerSequence] = useState<Color[]>([]);
   const [activeColor, setActiveColor] = useState<string | null>(null);
   const [isPlayerTurn, setIsPlayerTurn] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const audioCtx = useRef<AudioContext | null>(null);
 
@@ -131,58 +134,69 @@ export default function Game() {
     };
   }, []);
 
-  const playTone = (color: Color | "error", duration: number = 0.4) => {
-    const ctx = audioCtx.current;
-    if (!ctx) return;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    const freq = color === "error" ? ERROR_FREQ : FREQUENCIES[color];
-    const type = color === "error" ? "sawtooth" : "sine";
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
+  const playTone = useCallback(
+    (color: Color | "error", duration: number = 0.4) => {
+      if (!soundEnabled) return;
+      const ctx = audioCtx.current;
+      if (!ctx) return;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      const freq = color === "error" ? ERROR_FREQ : FREQUENCIES[color];
+      const type = color === "error" ? "sawtooth" : "sine";
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
 
-    // Smooth attack and release envelope to prevent clicks/pops
-    const attackTime = 0.02;
-    const releaseTime = 0.05;
-    const sustainTime = duration - attackTime - releaseTime;
+      // Smooth attack and release envelope to prevent clicks/pops
+      const attackTime = 0.02;
+      const releaseTime = 0.05;
+      const sustainTime = duration - attackTime - releaseTime;
 
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + attackTime);
-    gainNode.gain.setValueAtTime(0.2, ctx.currentTime + attackTime + sustainTime);
-    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + attackTime);
+      gainNode.gain.setValueAtTime(0.2, ctx.currentTime + attackTime + sustainTime);
+      gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
 
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + duration + 0.1); // Stop slightly after gain reaches 0
-  };
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + duration + 0.1); // Stop slightly after gain reaches 0
+    },
+    [soundEnabled]
+  );
 
-  const playSequence = useCallback(async (seq: Color[]) => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    for (let i = 0; i < seq.length; i++) {
-      const color = seq[i];
-      setActiveColor(color);
-      playTone(color);
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setActiveColor(null);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    setPlayerSequence([]);
-    setIsPlayerTurn(true);
-  }, []);
+  const playSequence = useCallback(
+    async (seq: Color[]) => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      for (let i = 0; i < seq.length; i++) {
+        const color = seq[i];
+        setActiveColor(color);
+        playTone(color);
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        setActiveColor(null);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      setPlayerSequence([]);
+      setIsPlayerTurn(true);
+    },
+    [playTone]
+  );
 
   useEffect(() => {
-    const loadHighScore = async () => {
+    const loadSettings = async () => {
       try {
         const storedHighScore = await AsyncStorage.getItem(HIGH_SCORE_KEY);
         if (storedHighScore !== null) {
           setHighScore(parseInt(storedHighScore, 10));
         }
+        const storedSoundEnabled = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
+        if (storedSoundEnabled !== null) {
+          setSoundEnabled(storedSoundEnabled === "true");
+        }
       } catch (error) {
-        console.error("Error loading high score", error);
+        console.error("Error loading settings", error);
       }
     };
-    loadHighScore();
+    loadSettings();
   }, []);
 
   // Play sequence when it changes
@@ -190,13 +204,28 @@ export default function Game() {
     if (gameStarted && sequence.length > 0 && !gameOver) {
       playSequence(sequence);
     }
-  }, [sequence, gameStarted, gameOver, playSequence]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sequence, gameStarted, gameOver]);
 
   const saveHighScore = async (newHighScore: number) => {
     try {
       await AsyncStorage.setItem(HIGH_SCORE_KEY, newHighScore.toString());
     } catch (error) {
       console.error("Error saving high score", error);
+    }
+  };
+
+  const toggleSound = async () => {
+    const newSoundEnabled = !soundEnabled;
+    setSoundEnabled(newSoundEnabled);
+
+    // Provide haptic feedback instead of sound
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      await AsyncStorage.setItem(SOUND_ENABLED_KEY, newSoundEnabled.toString());
+    } catch (error) {
+      console.error("Error saving sound setting", error);
     }
   };
 
@@ -262,6 +291,11 @@ export default function Game() {
           <Text style={styles.highScoreLabel}>BEST</Text>
         </View>
       </View>
+
+      {/* Sound Toggle - Bottom Left */}
+      <Pressable onPress={toggleSound} style={styles.soundButton}>
+        <Text style={styles.soundButtonText}>{soundEnabled ? "🔊" : "🔇"}</Text>
+      </Pressable>
 
       {/* Current Score Display - iOS Style */}
       <View style={styles.currentScoreDisplay}>
@@ -367,6 +401,26 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: "uppercase",
     marginTop: 2,
+  },
+  soundButton: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    zIndex: 10,
+  },
+  soundButtonText: {
+    fontSize: 24,
   },
   highScoreSection: {
     alignItems: "flex-end",
