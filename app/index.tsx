@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { AudioContext } from "react-native-audio-api";
+import AudioManager from "react-native-audio-api/src/system/AudioManager";
 
 const { width, height } = Dimensions.get("window");
 const gameBoardSize = Math.min(width, height) * 0.75;
@@ -79,6 +80,13 @@ export default function Game() {
   const audioCtx = useRef<AudioContext | null>(null);
 
   useEffect(() => {
+    // Configure audio session to use ambient category
+    // This prevents the app from triggering lock screen music controls
+    AudioManager.setAudioSessionOptions({
+      iosCategory: "ambient",
+      iosMode: "default",
+    });
+
     audioCtx.current = new AudioContext();
     const handleAppStateChange = (nextAppState: any) => {
       if (nextAppState === "active" && audioCtx.current?.state === "suspended") {
@@ -101,13 +109,21 @@ export default function Game() {
     const type = color === "error" ? "sawtooth" : "sine";
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
+
+    // Smooth attack and release envelope to prevent clicks/pops
+    const attackTime = 0.02;
+    const releaseTime = 0.05;
+    const sustainTime = duration - attackTime - releaseTime;
+
     gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + attackTime);
+    gainNode.gain.setValueAtTime(0.2, ctx.currentTime + attackTime + sustainTime);
+    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
     oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + duration);
+    oscillator.stop(ctx.currentTime + duration + 0.1); // Stop slightly after gain reaches 0
   };
 
   const playSequence = useCallback(async (seq: Color[]) => {
