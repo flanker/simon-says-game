@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
@@ -136,7 +136,11 @@ export default function Game() {
     }
 
     return () => {
-      bgmPlayer.pause();
+      try {
+        bgmPlayer.pause();
+      } catch (e) {
+        console.log("Error pausing BGM on cleanup", e);
+      }
     };
   }, []);
 
@@ -150,7 +154,7 @@ export default function Game() {
   }, [soundEnabled]);
 
   const playTone = useCallback(
-    (color: Color) => {
+    async (color: Color) => {
       if (!soundEnabled) return;
       const player = audioPlayers[color];
       try {
@@ -158,9 +162,8 @@ export default function Game() {
         if (player.playing) {
           player.pause();
         }
-        player.seekTo(0);
-        // Small delay to ensure seekTo completes
-        setTimeout(() => player.play(), 10);
+        await player.seekTo(0);
+        player.play();
       } catch (error) {
         console.warn('Error playing tone:', error);
       }
@@ -168,27 +171,27 @@ export default function Game() {
     [soundEnabled, audioPlayers]
   );
 
-  const playGameOver = useCallback(() => {
+  const playGameOver = useCallback(async () => {
     if (!soundEnabled) return;
     try {
       if (gameOverPlayer.playing) {
         gameOverPlayer.pause();
       }
-      gameOverPlayer.seekTo(0);
-      setTimeout(() => gameOverPlayer.play(), 10);
+      await gameOverPlayer.seekTo(0);
+      gameOverPlayer.play();
     } catch (error) {
       console.warn('Error playing game over sound:', error);
     }
   }, [soundEnabled, gameOverPlayer]);
 
-  const playWin = useCallback(() => {
+  const playWin = useCallback(async () => {
     if (!soundEnabled) return;
     try {
       if (winPlayer.playing) {
         winPlayer.pause();
       }
-      winPlayer.seekTo(0);
-      setTimeout(() => winPlayer.play(), 10);
+      await winPlayer.seekTo(0);
+      winPlayer.play();
     } catch (error) {
       console.warn('Error playing win sound:', error);
     }
@@ -286,7 +289,9 @@ export default function Game() {
     const newPlayerSequence = [...playerSequence, color];
     if (newPlayerSequence[newPlayerSequence.length - 1] !== sequence[newPlayerSequence.length - 1]) {
       // Wrong answer - play game over sound
-      playGameOver();
+      setTimeout(() => {
+        playGameOver();
+      }, 300);
       setGameOver(true);
       endGame();
       return;
@@ -294,7 +299,9 @@ export default function Game() {
     setPlayerSequence(newPlayerSequence);
     if (newPlayerSequence.length === sequence.length) {
       // Correct sequence completed - play win sound
-      playWin();
+      setTimeout(() => {
+        playWin();
+      }, 300);
       setScore(score + 1);
       setTimeout(addNewColorToSequence, 1000);
     }
