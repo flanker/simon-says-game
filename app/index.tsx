@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 const gameBoardSize = Math.min(width, height) * 0.75;
@@ -110,6 +110,24 @@ export default function Game() {
   const [isPlayerTurn, setIsPlayerTurn] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
+  // Animations
+  const scoreHighlight = useSharedValue(0);
+  const boardShake = useSharedValue(0);
+  const gameOverScale = useSharedValue(0);
+
+  const scoreAnimatedStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(scoreHighlight.value, [0, 1], ["#475569", "#6FD0B2"]), // slate-600 to seafoam
+  }));
+
+  const boardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: boardShake.value }],
+  }));
+
+  const gameOverAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: gameOverScale.value }],
+    opacity: gameOverScale.value,
+  }));
+
   // Audio players for each color
   const doPlayer = useAudioPlayer(SOUND_FILES[Color.Green]);
   const rePlayer = useAudioPlayer(SOUND_FILES[Color.Red]);
@@ -172,6 +190,18 @@ export default function Game() {
   );
 
   const playGameOver = useCallback(async () => {
+    // Trigger shake animation
+    boardShake.value = withSequence(
+      withTiming(10, { duration: 50 }),
+      withTiming(-10, { duration: 50 }),
+      withTiming(10, { duration: 50 }),
+      withTiming(-10, { duration: 50 }),
+      withTiming(0, { duration: 50 })
+    );
+
+    // Show Game Over popup
+    gameOverScale.value = withSpring(1);
+
     if (!soundEnabled) return;
     try {
       if (gameOverPlayer.playing) {
@@ -185,6 +215,9 @@ export default function Game() {
   }, [soundEnabled, gameOverPlayer]);
 
   const playWin = useCallback(async () => {
+    // Trigger score highlight animation
+    scoreHighlight.value = withSequence(withTiming(1, { duration: 200 }), withTiming(0, { duration: 500 }));
+
     if (!soundEnabled) return;
     try {
       if (winPlayer.playing) {
@@ -269,6 +302,7 @@ export default function Game() {
     setPlayerSequence([]);
     setIsPlayerTurn(false);
     setActiveColor(null);
+    gameOverScale.value = withTiming(0, { duration: 200 });
 
     // Start with a fresh sequence
     const firstColor = colors[Math.floor(Math.random() * colors.length)];
@@ -339,7 +373,7 @@ export default function Game() {
 
       {/* Current Score Display - iOS Style */}
       <View style={styles.currentScoreDisplay}>
-        <Text style={styles.currentScoreNumber}>{score}</Text>
+        <Animated.Text style={[styles.currentScoreNumber, scoreAnimatedStyle]}>{score}</Animated.Text>
         <View style={styles.currentScoreLabelContainer}>
           <Text style={styles.currentScoreLabel}>CURRENT SCORE</Text>
         </View>
@@ -347,7 +381,7 @@ export default function Game() {
 
       {/* Game Board - Circular Container */}
       <View style={styles.gameBoardContainer}>
-        <View style={styles.gameBoard}>
+        <Animated.View style={[styles.gameBoard, boardAnimatedStyle]}>
           <View style={styles.padsGrid}>
             <GamePad
               color={Color.Green}
@@ -374,20 +408,35 @@ export default function Game() {
               isActive={activeColor === Color.Blue}
             />
           </View>
-        </View>
+        </Animated.View>
       </View>
+
+      {/* Game Over Popup */}
+      <Animated.View style={[styles.gameOverOverlay, gameOverAnimatedStyle]} pointerEvents={gameOver ? "auto" : "none"}>
+        <View style={styles.gameOverBox}>
+          <Text style={styles.gameOverText}>GAME OVER</Text>
+          <Pressable
+            style={({ pressed }) => [styles.tryAgainButton, pressed && styles.tryAgainButtonPressed]}
+            onPress={handleStartGame}
+          >
+            <Text style={styles.tryAgainButtonText}>TRY AGAIN</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
 
       {/* Controls */}
       <View style={styles.controls}>
         <Pressable
           style={({ pressed }) => [
             styles.startButton,
-            gameOver ? styles.startButtonGameOver : gameStarted ? styles.startButtonRestart : styles.startButtonStart,
+            gameStarted ? styles.startButtonRestart : styles.startButtonStart,
             pressed && styles.startButtonPressed,
+            { opacity: gameOver ? 0 : 1 },
           ]}
           onPress={handleStartGame}
+          disabled={gameOver}
         >
-          <Text style={styles.startButtonText}>{gameOver ? "TRY AGAIN" : gameStarted ? "RESTART" : "START GAME"}</Text>
+          <Text style={styles.startButtonText}>{gameStarted ? "RESTART" : "START GAME"}</Text>
         </Pressable>
 
         <Text style={styles.hintText}>
@@ -625,6 +674,54 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "white",
     borderRadius: 1000,
+  },
+  gameOverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+    backgroundColor: "rgba(255, 255, 255, 0.5)", // Semi-transparent background
+  },
+  gameOverBox: {
+    backgroundColor: "#ffffff",
+    padding: 32,
+    borderRadius: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 4,
+    borderColor: "#E06573", // strawberry border
+  },
+  gameOverText: {
+    fontSize: 40,
+    fontWeight: "900",
+    color: "#E06573", // strawberry
+    marginBottom: 24,
+    letterSpacing: -1,
+  },
+  tryAgainButton: {
+    backgroundColor: "#E06573", // strawberry
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    shadowColor: "#E06573",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  tryAgainButtonPressed: {
+    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
+  },
+  tryAgainButtonText: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "bold",
+    letterSpacing: 1,
   },
 });
 
