@@ -1,10 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
-import { AudioContext } from "react-native-audio-api";
-import AudioManager from "react-native-audio-api/src/system/AudioManager";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
@@ -22,13 +21,13 @@ enum Color {
 
 const colors = [Color.Green, Color.Red, Color.Yellow, Color.Blue];
 
-const FREQUENCIES: Record<Color, number> = {
-  [Color.Green]: 329.63, // E4
-  [Color.Red]: 261.63, // C4
-  [Color.Yellow]: 220.0, // A3
-  [Color.Blue]: 164.81, // E3
+// Audio file mapping: Green=do, Red=re, Yellow=mi, Blue=fa
+const SOUND_FILES: Record<Color, any> = {
+  [Color.Green]: require("@/assets/sound/do.wav"),
+  [Color.Red]: require("@/assets/sound/re.wav"),
+  [Color.Yellow]: require("@/assets/sound/mi.wav"),
+  [Color.Blue]: require("@/assets/sound/fa.wav"),
 };
-const ERROR_FREQ = 110; // A2
 
 const HIGH_SCORE_KEY = "simon_says_high_score";
 const SOUND_ENABLED_KEY = "simon_says_sound_enabled";
@@ -111,58 +110,66 @@ export default function Game() {
   const [isPlayerTurn, setIsPlayerTurn] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const audioCtx = useRef<AudioContext | null>(null);
+  // Audio players for each color
+  const doPlayer = useAudioPlayer(SOUND_FILES[Color.Green]);
+  const rePlayer = useAudioPlayer(SOUND_FILES[Color.Red]);
+  const miPlayer = useAudioPlayer(SOUND_FILES[Color.Yellow]);
+  const faPlayer = useAudioPlayer(SOUND_FILES[Color.Blue]);
+  const gameOverPlayer = useAudioPlayer(require("@/assets/sound/game-over.wav"));
+  const winPlayer = useAudioPlayer(require("@/assets/sound/instant-win.wav"));
+  const bgmPlayer = useAudioPlayer(require("@/assets/sound/bgm.mp3"));
 
+  // Map colors to their audio players
+  const audioPlayers: Record<Color, ReturnType<typeof useAudioPlayer>> = {
+    [Color.Green]: doPlayer,
+    [Color.Red]: rePlayer,
+    [Color.Yellow]: miPlayer,
+    [Color.Blue]: faPlayer,
+  };
+
+  // Setup background music
   useEffect(() => {
-    // Configure audio session to use ambient category
-    // This prevents the app from triggering lock screen music controls
-    AudioManager.setAudioSessionOptions({
-      iosCategory: "ambient",
-      iosMode: "default",
-    });
+    bgmPlayer.loop = true;
+    bgmPlayer.volume = 0.3; // Lower volume for background music
+    if (soundEnabled) {
+      bgmPlayer.play();
+    }
 
-    audioCtx.current = new AudioContext();
-    const handleAppStateChange = (nextAppState: any) => {
-      if (nextAppState === "active" && audioCtx.current?.state === "suspended") {
-        audioCtx.current.resume();
-      }
-    };
-    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
-      subscription.remove();
-      audioCtx.current?.close();
+      bgmPlayer.pause();
     };
   }, []);
 
+  // Control BGM based on sound settings
+  useEffect(() => {
+    if (soundEnabled) {
+      bgmPlayer.play();
+    } else {
+      bgmPlayer.pause();
+    }
+  }, [soundEnabled]);
+
   const playTone = useCallback(
-    (color: Color | "error", duration: number = 0.4) => {
+    (color: Color) => {
       if (!soundEnabled) return;
-      const ctx = audioCtx.current;
-      if (!ctx) return;
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      const freq = color === "error" ? ERROR_FREQ : FREQUENCIES[color];
-      const type = color === "error" ? "sawtooth" : "sine";
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
-
-      // Smooth attack and release envelope to prevent clicks/pops
-      const attackTime = 0.02;
-      const releaseTime = 0.05;
-      const sustainTime = duration - attackTime - releaseTime;
-
-      gainNode.gain.setValueAtTime(0, ctx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + attackTime);
-      gainNode.gain.setValueAtTime(0.2, ctx.currentTime + attackTime + sustainTime);
-      gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + duration + 0.1); // Stop slightly after gain reaches 0
+      const player = audioPlayers[color];
+      player.seekTo(0); // Reset to beginning
+      player.play();
     },
-    [soundEnabled]
+    [soundEnabled, audioPlayers]
   );
+
+  const playGameOver = useCallback(() => {
+    if (!soundEnabled) return;
+    gameOverPlayer.seekTo(0);
+    gameOverPlayer.play();
+  }, [soundEnabled, gameOverPlayer]);
+
+  const playWin = useCallback(() => {
+    if (!soundEnabled) return;
+    winPlayer.seekTo(0);
+    winPlayer.play();
+  }, [soundEnabled, winPlayer]);
 
   const playSequence = useCallback(
     async (seq: Color[]) => {
@@ -255,13 +262,16 @@ export default function Game() {
     playTone(color);
     const newPlayerSequence = [...playerSequence, color];
     if (newPlayerSequence[newPlayerSequence.length - 1] !== sequence[newPlayerSequence.length - 1]) {
-      playTone("error", 0.8);
+      // Wrong answer - play game over sound
+      playGameOver();
       setGameOver(true);
       endGame();
       return;
     }
     setPlayerSequence(newPlayerSequence);
     if (newPlayerSequence.length === sequence.length) {
+      // Correct sequence completed - play win sound
+      playWin();
       setScore(score + 1);
       setTimeout(addNewColorToSequence, 1000);
     }

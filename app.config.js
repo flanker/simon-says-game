@@ -59,6 +59,7 @@ const config = {
         },
       ],
       "react-native-audio-api",
+      "expo-audio",
     ],
     experiments: {
       typedRoutes: true,
