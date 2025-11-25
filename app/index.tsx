@@ -153,22 +153,45 @@ export default function Game() {
     (color: Color) => {
       if (!soundEnabled) return;
       const player = audioPlayers[color];
-      player.seekTo(0); // Reset to beginning
-      player.play();
+      try {
+        // Force restart: pause, seek to start, then play
+        if (player.playing) {
+          player.pause();
+        }
+        player.seekTo(0);
+        // Small delay to ensure seekTo completes
+        setTimeout(() => player.play(), 10);
+      } catch (error) {
+        console.warn('Error playing tone:', error);
+      }
     },
     [soundEnabled, audioPlayers]
   );
 
   const playGameOver = useCallback(() => {
     if (!soundEnabled) return;
-    gameOverPlayer.seekTo(0);
-    gameOverPlayer.play();
+    try {
+      if (gameOverPlayer.playing) {
+        gameOverPlayer.pause();
+      }
+      gameOverPlayer.seekTo(0);
+      setTimeout(() => gameOverPlayer.play(), 10);
+    } catch (error) {
+      console.warn('Error playing game over sound:', error);
+    }
   }, [soundEnabled, gameOverPlayer]);
 
   const playWin = useCallback(() => {
     if (!soundEnabled) return;
-    winPlayer.seekTo(0);
-    winPlayer.play();
+    try {
+      if (winPlayer.playing) {
+        winPlayer.pause();
+      }
+      winPlayer.seekTo(0);
+      setTimeout(() => winPlayer.play(), 10);
+    } catch (error) {
+      console.warn('Error playing win sound:', error);
+    }
   }, [soundEnabled, winPlayer]);
 
   const playSequence = useCallback(
