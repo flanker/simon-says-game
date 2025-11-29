@@ -7,9 +7,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
+  Easing,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -40,6 +43,76 @@ const SOUND_FILES: Record<Color, any> = {
 
 const HIGH_SCORE_KEY = "simon_says_high_score";
 const SOUND_ENABLED_KEY = "simon_says_sound_enabled";
+
+// =================================================================
+// Confetti Component
+// =================================================================
+interface ConfettiPieceProps {
+  delay: number;
+  color: string;
+}
+
+const ConfettiPiece: React.FC<ConfettiPieceProps> = ({ delay, color }) => {
+  const translateY = useSharedValue(-100);
+  const translateX = useSharedValue(0);
+  const rotate = useSharedValue(0);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    const startX = (Math.random() - 0.5) * width;
+    translateX.value = startX;
+
+    translateY.value = withDelay(
+      delay,
+      withTiming(height + 100, {
+        duration: 2500 + Math.random() * 1000,
+        easing: Easing.cubic,
+      })
+    );
+
+    rotate.value = withDelay(
+      delay,
+      withRepeat(
+        withTiming(360, {
+          duration: 1000 + Math.random() * 1000,
+          easing: Easing.linear,
+        }),
+        -1,
+        false
+      )
+    );
+
+    opacity.value = withDelay(
+      delay,
+      withSequence(withTiming(1, { duration: 100 }), withDelay(2000, withTiming(0, { duration: 500 })))
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { rotate: `${rotate.value}deg` }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.confettiPiece, { backgroundColor: color }, animatedStyle]} />;
+};
+
+interface ConfettiProps {
+  active: boolean;
+}
+
+const Confetti: React.FC<ConfettiProps> = ({ active }) => {
+  const confettiColors = ["#FF8593", "#6FD0B2", "#FFD768", "#85C4FF", "#E06573", "#4FB092", "#E0B849", "#65A4DF"];
+
+  if (!active) return null;
+
+  return (
+    <View style={styles.confettiContainer} pointerEvents="none">
+      {Array.from({ length: 50 }).map((_, i) => (
+        <ConfettiPiece key={i} delay={i * 30} color={confettiColors[i % confettiColors.length]} />
+      ))}
+    </View>
+  );
+};
 
 // =================================================================
 // GamePad Component
@@ -119,11 +192,14 @@ export default function Game() {
   const [activeColor, setActiveColor] = useState<string | null>(null);
   const [isPlayerTurn, setIsPlayerTurn] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showHighScoreCelebration, setShowHighScoreCelebration] = useState(false);
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
 
   // Animations
   const scoreHighlight = useSharedValue(0);
   const boardShake = useSharedValue(0);
   const gameOverScale = useSharedValue(0);
+  const highScoreCelebrationScale = useSharedValue(0);
 
   const scoreAnimatedStyle = useAnimatedStyle(() => ({
     color: interpolateColor(scoreHighlight.value, [0, 1], ["#475569", "#6FD0B2"]), // slate-600 to seafoam
@@ -138,6 +214,11 @@ export default function Game() {
     opacity: gameOverScale.value,
   }));
 
+  const highScoreCelebrationAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: highScoreCelebrationScale.value }],
+    opacity: highScoreCelebrationScale.value,
+  }));
+
   // Audio players for each color
   const doPlayer = useAudioPlayer(SOUND_FILES[Color.Green]);
   const rePlayer = useAudioPlayer(SOUND_FILES[Color.Red]);
@@ -145,6 +226,7 @@ export default function Game() {
   const faPlayer = useAudioPlayer(SOUND_FILES[Color.Blue]);
   const gameOverPlayer = useAudioPlayer(require("@/assets/sound/game-over.wav"));
   const winPlayer = useAudioPlayer(require("@/assets/sound/instant-win.wav"));
+  const highScorePlayer = useAudioPlayer(require("@/assets/sound/high-score.wav"));
   const bgmPlayer = useAudioPlayer(require("@/assets/sound/bgm.mp3"));
 
   // Map colors to their audio players
@@ -240,6 +322,28 @@ export default function Game() {
     }
   }, [soundEnabled, winPlayer]);
 
+  const playHighScore = useCallback(async () => {
+    if (!soundEnabled) return;
+    try {
+      if (highScorePlayer.playing) {
+        highScorePlayer.pause();
+      }
+      await highScorePlayer.seekTo(0);
+      highScorePlayer.play();
+    } catch (error) {
+      console.warn("Error playing high score sound:", error);
+    }
+  }, [soundEnabled, highScorePlayer]);
+
+  const showHighScoreCelebrationPopup = useCallback(() => {
+    setShowHighScoreCelebration(true);
+    highScoreCelebrationScale.value = withSpring(1, {
+      damping: 15,
+      stiffness: 150,
+    });
+    playHighScore();
+  }, [playHighScore]);
+
   const playSequence = useCallback(
     async (seq: Color[]) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -319,7 +423,10 @@ export default function Game() {
     setPlayerSequence([]);
     setIsPlayerTurn(false);
     setActiveColor(null);
+    setShowHighScoreCelebration(false);
+    setIsNewHighScore(false);
     gameOverScale.value = withTiming(0, { duration: 200 });
+    highScoreCelebrationScale.value = withTiming(0, { duration: 200 });
 
     // Start with a fresh sequence
     const firstColor = colors[Math.floor(Math.random() * colors.length)];
@@ -359,9 +466,16 @@ export default function Game() {
   };
 
   const endGame = () => {
-    if (score > highScore) {
+    const hasNewHighScore = score > highScore;
+    if (hasNewHighScore) {
       setHighScore(score);
       saveHighScore(score);
+      setIsNewHighScore(true);
+
+      // Show high score celebration after game over popup (2 seconds delay)
+      setTimeout(() => {
+        showHighScoreCelebrationPopup();
+      }, 2000);
     }
     setGameStarted(false);
     setSequence([]);
@@ -441,6 +555,31 @@ export default function Game() {
             onPress={handleStartGame}
           >
             <Text style={styles.tryAgainButtonText}>{t("game.playAgain").toUpperCase()}</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+
+      {/* High Score Celebration Popup */}
+      <Animated.View
+        style={[styles.highScoreCelebrationOverlay, highScoreCelebrationAnimatedStyle]}
+        pointerEvents={showHighScoreCelebration ? "auto" : "none"}
+      >
+        <Confetti active={showHighScoreCelebration} />
+        <View style={styles.highScoreCelebrationBox}>
+          <Text style={styles.highScoreCelebrationEmoji}>🎉</Text>
+          <Text style={styles.highScoreCelebrationTitle}>NEW HIGH SCORE!</Text>
+          <Text style={styles.highScoreCelebrationScore}>{score}</Text>
+          <LinearGradient
+            colors={["#FFD768", "#FF8593", "#85C4FF", "#6FD0B2"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.highScoreCelebrationGradient}
+          />
+          <Pressable
+            style={({ pressed }) => [styles.highScoreContinueButton, pressed && styles.highScoreContinueButtonPressed]}
+            onPress={handleStartGame}
+          >
+            <Text style={styles.highScoreContinueButtonText}>PLAY AGAIN</Text>
           </Pressable>
         </View>
       </Animated.View>
@@ -765,6 +904,96 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     letterSpacing: 1,
+  },
+  // Confetti styles
+  confettiContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+  },
+  confettiPiece: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    top: 0,
+    left: width / 2,
+  },
+  // High Score Celebration styles
+  highScoreCelebrationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 150,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  highScoreCelebrationBox: {
+    backgroundColor: "#ffffff",
+    padding: 48,
+    borderRadius: 32,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 20,
+    borderWidth: 6,
+    borderColor: "#FFD768",
+    overflow: "hidden",
+    position: "relative",
+  },
+  highScoreCelebrationGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 8,
+  },
+  highScoreCelebrationEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  highScoreCelebrationTitle: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#FFD768",
+    marginBottom: 24,
+    letterSpacing: 1,
+    textShadowColor: "rgba(255, 215, 104, 0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  highScoreCelebrationScore: {
+    fontSize: 72,
+    fontWeight: "200",
+    color: "#FF8593",
+    fontFamily: "monospace",
+    marginBottom: 32,
+    textShadowColor: "rgba(255, 133, 147, 0.2)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 20,
+  },
+  highScoreContinueButton: {
+    backgroundColor: "#6FD0B2",
+    paddingVertical: 18,
+    paddingHorizontal: 48,
+    borderRadius: 20,
+    shadowColor: "#6FD0B2",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    borderBottomWidth: 4,
+    borderBottomColor: "#4FB092",
+  },
+  highScoreContinueButtonPressed: {
+    transform: [{ scale: 0.95 }, { translateY: 2 }],
+    opacity: 0.9,
+    borderBottomWidth: 2,
+  },
+  highScoreContinueButtonText: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "bold",
+    letterSpacing: 1.5,
   },
 });
 
