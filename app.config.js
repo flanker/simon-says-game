@@ -13,20 +13,23 @@ function getCurrentBuildNumber() {
 
 const config = {
   expo: {
-    name: "simon-says-game",
-    slug: "simon-says-game",
+    name: "Memory Master",
+    slug: "memory-master",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "simonsaysgame",
+    scheme: "memorymaster",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: "me.fengzhichao.simonsays",
       buildNumber: getCurrentBuildNumber(),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        CFBundleDevelopmentRegion: "en",
+        CFBundleAllowMixedLocalizations: true,
+        CFBundleLocalizations: ["en", "zh-Hans"],
         NSMicrophoneUsageDescription: "This app needs access to microphone to provide services.",
       },
     },
@@ -60,6 +63,14 @@ const config = {
       ],
       "react-native-audio-api",
       "expo-audio",
+      [
+        "expo-localization",
+        {
+          supportedLocales: {
+            ios: ["en", "zh-Hans"],
+          },
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

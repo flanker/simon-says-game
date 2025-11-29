@@ -1,10 +1,19 @@
+import i18n from "@/i18n";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 const gameBoardSize = Math.min(width, height) * 0.75;
@@ -100,6 +109,7 @@ const GamePad: React.FC<GamePadProps> = ({ color, isActive, onClick, disabled })
 // Main Game Component
 // =================================================================
 export default function Game() {
+  const { t } = useTranslation("common");
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
@@ -183,7 +193,7 @@ export default function Game() {
         await player.seekTo(0);
         player.play();
       } catch (error) {
-        console.warn('Error playing tone:', error);
+        console.warn("Error playing tone:", error);
       }
     },
     [soundEnabled, audioPlayers]
@@ -210,7 +220,7 @@ export default function Game() {
       await gameOverPlayer.seekTo(0);
       gameOverPlayer.play();
     } catch (error) {
-      console.warn('Error playing game over sound:', error);
+      console.warn("Error playing game over sound:", error);
     }
   }, [soundEnabled, gameOverPlayer]);
 
@@ -226,7 +236,7 @@ export default function Game() {
       await winPlayer.seekTo(0);
       winPlayer.play();
     } catch (error) {
-      console.warn('Error playing win sound:', error);
+      console.warn("Error playing win sound:", error);
     }
   }, [soundEnabled, winPlayer]);
 
@@ -295,6 +305,13 @@ export default function Game() {
     }
   };
 
+  const toggleLanguage = async () => {
+    const currentLang = i18n.language;
+    const newLang = currentLang === "en" ? "zh-CN" : "en";
+    await i18n.changeLanguage(newLang);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   const handleStartGame = () => {
     setGameStarted(true);
     setGameOver(false);
@@ -356,26 +373,30 @@ export default function Game() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleSection}>
-          <Text style={styles.title}>SIMON</Text>
-          <Text style={styles.titleAccent}>SAYS</Text>
-          <Text style={styles.subtitle}>Memory Game</Text>
+          <Text style={styles.title}>{t("game.titleUp")}</Text>
+          <Text style={styles.titleAccent}>{t("game.titleDown")}</Text>
         </View>
         <View style={styles.highScoreSection}>
           <Text style={styles.highScoreValue}>{highScore}</Text>
-          <Text style={styles.highScoreLabel}>BEST</Text>
+          <Text style={styles.highScoreLabel}>{t("game.highScore").toUpperCase()}</Text>
         </View>
       </View>
 
       {/* Sound Toggle - Bottom Left */}
-      <Pressable onPress={toggleSound} style={styles.soundButton}>
+      {/* <Pressable onPress={toggleSound} style={styles.soundButton}>
         <Text style={styles.soundButtonText}>{soundEnabled ? "🔊" : "🔇"}</Text>
-      </Pressable>
+      </Pressable> */}
+
+      {/* Language Toggle - Bottom Right */}
+      {/* <Pressable onPress={toggleLanguage} style={styles.languageButton}>
+        <Text style={styles.languageButtonText}>{i18n.language === "en" ? "EN" : "中"}</Text>
+      </Pressable> */}
 
       {/* Current Score Display - iOS Style */}
       <View style={styles.currentScoreDisplay}>
         <Animated.Text style={[styles.currentScoreNumber, scoreAnimatedStyle]}>{score}</Animated.Text>
         <View style={styles.currentScoreLabelContainer}>
-          <Text style={styles.currentScoreLabel}>CURRENT SCORE</Text>
+          <Text style={styles.currentScoreLabel}>{t("game.score").toUpperCase()}</Text>
         </View>
       </View>
 
@@ -414,12 +435,12 @@ export default function Game() {
       {/* Game Over Popup */}
       <Animated.View style={[styles.gameOverOverlay, gameOverAnimatedStyle]} pointerEvents={gameOver ? "auto" : "none"}>
         <View style={styles.gameOverBox}>
-          <Text style={styles.gameOverText}>GAME OVER</Text>
+          <Text style={styles.gameOverText}>{t("game.gameOver").toUpperCase()}</Text>
           <Pressable
             style={({ pressed }) => [styles.tryAgainButton, pressed && styles.tryAgainButtonPressed]}
             onPress={handleStartGame}
           >
-            <Text style={styles.tryAgainButtonText}>TRY AGAIN</Text>
+            <Text style={styles.tryAgainButtonText}>{t("game.playAgain").toUpperCase()}</Text>
           </Pressable>
         </View>
       </Animated.View>
@@ -436,11 +457,11 @@ export default function Game() {
           onPress={handleStartGame}
           disabled={gameOver}
         >
-          <Text style={styles.startButtonText}>{gameStarted ? "RESTART" : "START GAME"}</Text>
+          <Text style={styles.startButtonText}>{t(gameStarted ? "game.playAgain" : "game.start").toUpperCase()}</Text>
         </Pressable>
 
         <Text style={styles.hintText}>
-          {gameStarted ? (isPlayerTurn ? "Repeat the pattern!" : "Watch the sequence...") : "Press Start to begin."}
+          {gameStarted ? (isPlayerTurn ? t("game.repeatPattern") : t("game.watchSequence")) : t("game.pressStart")}
         </Text>
       </View>
     </View>
@@ -511,12 +532,34 @@ const styles = StyleSheet.create({
   soundButtonText: {
     fontSize: 24,
   },
+  languageButton: {
+    position: "absolute",
+    bottom: 40,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    zIndex: 10,
+  },
+  languageButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#475569",
+  },
   highScoreSection: {
     alignItems: "flex-end",
     paddingBottom: 4,
   },
   highScoreLabel: {
-    fontSize: 10,
+    fontSize: 14,
     color: "#94a3b8", // slate-400
     fontWeight: "bold",
     letterSpacing: 1.5,
@@ -548,7 +591,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   currentScoreLabel: {
-    fontSize: 11,
+    fontSize: 14,
     color: "#94a3b8", // slate-400
     fontWeight: "600",
     letterSpacing: 2,

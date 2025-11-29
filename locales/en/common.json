@@ -1,0 +1,28 @@
+{
+  "game": {
+    "title": "Memory Game",
+    "titleUp": "Memory",
+    "titleDown": "Master",
+    "score": "Current Score",
+    "highScore": "Best",
+    "start": "Start Game",
+    "gameOver": "Game Over",
+    "youWin": "You Win!",
+    "finalScore": "Your score: {{score}}",
+    "newHighScore": "New High Score!",
+    "playAgain": "Try Again",
+    "repeatPattern": "Repeat the pattern!",
+    "watchSequence": "Watch the sequence...",
+    "pressStart": "Press Start to begin."
+  },
+  "settings": {
+    "sound": "Sound",
+    "soundOn": "Sound On",
+    "soundOff": "Sound Off",
+    "language": "Language"
+  },
+  "languages": {
+    "en": "English",
+    "zh-CN": "简体中文"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "game": {
+    "title": "记忆游戏",
+    "titleUp": "记忆",
+    "titleDown": "大师",
+    "score": "当前分数",
+    "highScore": "最高分",
+    "start": "开始游戏",
+    "gameOver": "GAME OVER",
+    "youWin": "你赢了!",
+    "finalScore": "你的得分: {{score}}",
+    "newHighScore": "新纪录!",
+    "playAgain": "重新开始",
+    "repeatPattern": "重复这个图案!",
+    "watchSequence": "观看序列...",
+    "pressStart": "按开始按钮开始游戏。"
+  },
+  "settings": {
+    "sound": "声音",
+    "soundOn": "声音开启",
+    "soundOff": "声音关闭",
+    "language": "语言"
+  },
+  "languages": {
+    "en": "English",
+    "zh-CN": "简体中文"
+  }
+}
